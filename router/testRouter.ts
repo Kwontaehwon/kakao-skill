@@ -26,12 +26,11 @@ testRouter.post("/abc", async (req, res, next) => {
   console.log(JSON.stringify(req.body, null, 2));
   const contextParam = req.body.contexts[0].params;
 
-  const deposit = contextParam["deposit"];
-  const end_date = contextParam["end_date"];
-  const home_address = contextParam["home_address"];
+  const deposit = contextParam["deposit"].toString();
+  const end_date = contextParam["end_date"].toString();
+  const home_address = contextParam["home_address"].toString();
 
-  const fileName = "output_985b3c39663a1592ba7a9e3d1964fb0e.docx";
-  console.log(deposit);
+  const fileName = generateDocx(deposit, end_date, home_address);
 
   const responseBody = {
     version: "2.0",
@@ -85,7 +84,7 @@ testRouter.post("/abc", async (req, res, next) => {
     },
   };
 
- return res.status(200).send(responseBody);
+  res.status(200).send(responseBody);
 });
 
 testRouter.get("/download", (req, res) => {
