@@ -1,9 +1,8 @@
 import express, { Response, Router } from "express";
-import { exec } from "child_process";
+import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
-import { generateDocx } from "../module/generateDocx";
+import { generateDocx, generateHash } from "../module/generateDocx";
 
 const testRouter: Router = express.Router();
 
@@ -30,62 +29,88 @@ testRouter.post("/abc", async (req, res, next) => {
   const end_date = contextParam["end_date"]["value"].toString();
   const home_address = contextParam["home_address"]["value"].toString();
 
-  const fileName = await generateDocx(deposit, end_date, home_address);
-  console.log("FN" + fileName);
+  const curDate = Date.now().toString();
 
-  const responseBody = {
-    version: "2.0",
-    template: {
-      outputs: [
-        {
-          itemCard: {
-            imageTitle: {
-              title: "지급명령서",
-              description: "법률 문서 자동생성",
-            },
-            title: "",
-            description: "",
-            thumbnail: {
-              imageUrl:
-                "http://dev-mk.kakao.com/dn/bot/scripts/with_barcode_blue_1x1.png",
-              width: 800,
-              height: 800,
-            },
-            profile: {
-              title: "LawBot",
-              imageUrl:
-                "https://t1.kakaocdn.net/openbuilder/docs_image/aaairline.jpg",
-            },
-            itemList: [
+  const hash = await generateHash(curDate);
+
+  // Child Process를 사용하여 파이썬 코드 실행
+
+  const result_01 = await spawn("python3", [
+    "docx_generator.py",
+    deposit,
+    end_date,
+    home_address,
+  ]);
+
+  await result_01.stdout.on("data", async (result) => {
+    const currentFileName = "output.docx"; // 현재 파일 이름
+    const newFileName = `output_${hash}.docx`; // 새로운 파일 이름
+    const currentFilePath = path.join(__dirname, "../", currentFileName); // 현재 파일 경로
+    const newFilePath = path.join(__dirname, "../generatedDocx/", newFileName); // 새로운 파일 경로
+
+    await fs.rename(currentFilePath, newFilePath, (err) => {
+      if (err) {
+        console.error("파일 이름 변경 실패:", err);
+      } else {
+        console.log("파일 이름 변경 성공: " + newFileName);
+        const responseBody = {
+          version: "2.0",
+          template: {
+            outputs: [
               {
-                title: "임대차 종료 일자",
-                description: end_date,
-              },
-              {
-                title: "부동산",
-                description: home_address,
+                itemCard: {
+                  imageTitle: {
+                    title: "지급명령서",
+                    description: "법률 문서 자동생성",
+                  },
+                  title: "",
+                  description: "",
+                  thumbnail: {
+                    imageUrl:
+                      "http://dev-mk.kakao.com/dn/bot/scripts/with_barcode_blue_1x1.png",
+                    width: 800,
+                    height: 800,
+                  },
+                  profile: {
+                    title: "LawBot",
+                    imageUrl:
+                      "https://t1.kakaocdn.net/openbuilder/docs_image/aaairline.jpg",
+                  },
+                  itemList: [
+                    {
+                      title: "임대차 종료 일자",
+                      description: end_date,
+                    },
+                    {
+                      title: "부동산",
+                      description: home_address,
+                    },
+                  ],
+                  itemListAlignment: "right",
+                  itemListSummary: {
+                    title: "보증금",
+                    description: deposit,
+                  },
+                  buttons: [
+                    {
+                      label: "다운로드 하기",
+                      action: "webLink",
+                      webLinkUrl: `http://13.125.20.89:3000/api/test/download?fileName=${newFileName}`,
+                    },
+                  ],
+                  buttonLayout: "vertical",
+                },
               },
             ],
-            itemListAlignment: "right",
-            itemListSummary: {
-              title: "보증금",
-              description: deposit,
-            },
-            buttons: [
-              {
-                label: "다운로드 하기",
-                action: "webLink",
-                webLinkUrl: `http://13.125.20.89:3000/api/test/download?fileName=${fileName}`,
-              },
-            ],
-            buttonLayout: "vertical",
           },
-        },
-      ],
-    },
-  };
+        };
 
-  res.status(200).send(responseBody);
+        res.status(200).send(responseBody);
+      }
+
+      // 결과 파일을 클라이언트로 전송
+    });
+  });
 });
 
 testRouter.get("/download", (req, res) => {
