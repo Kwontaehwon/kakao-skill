@@ -53,6 +53,8 @@ const generateDocx = async (
       });
 
       // 결과 파일을 클라이언트로 전송
+      console.log(newFileName);
+
       return newFileName;
     }
   );
