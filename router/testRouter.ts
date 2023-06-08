@@ -26,11 +26,12 @@ testRouter.post("/abc", async (req, res, next) => {
   console.log(JSON.stringify(req.body, null, 2));
   const contextParam = req.body.contexts[0].params;
 
-  const deposit = contextParam["deposit"].toString();
-  const end_date = contextParam["end_date"].toString();
-  const home_address = contextParam["home_address"].toString();
+  const deposit = contextParam["deposit"]["value"].toString();
+  const end_date = contextParam["end_date"]["value"].toString();
+  const home_address = contextParam["home_address"]["value"].toString();
 
-  const fileName = generateDocx(deposit, end_date, home_address);
+  const fileName = await generateDocx(deposit, end_date, home_address);
+  console.log("FN" + fileName);
 
   const responseBody = {
     version: "2.0",
