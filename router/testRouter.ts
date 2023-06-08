@@ -3,13 +3,9 @@ import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { generateDocx } from "../module/generateDocx";
 
 const testRouter: Router = express.Router();
-
-const generateHash = (str: string) => {
-  const hash = crypto.createHash("md5").update(str).digest("hex");
-  return hash;
-};
 
 const success = (
   res: Response,
@@ -28,13 +24,13 @@ const fail = (res: Response, code: number, message: string) => {
 
 testRouter.post("/abc", async (req, res, next) => {
   console.log(JSON.stringify(req.body, null, 2));
-  console.log(req.body.contexts[0].params["deposit"]);
+  const contextParam = req.body.contexts[0].params;
 
-  const params = req.body.contexts[0].params;
+  const deposit = contextParam["deposit"];
+  const end_date = contextParam["end_date"];
+  const home_address = contextParam["home_address"];
 
-  const deposit = 1000000;
-  const end_date = "2023년 12월 31일";
-  const home_address = "주소 입력";
+  const fileName = generateDocx(deposit, end_date, home_address);
 
   const responseBody = {
     version: "2.0",
@@ -43,8 +39,8 @@ testRouter.post("/abc", async (req, res, next) => {
         {
           itemCard: {
             imageTitle: {
-              title: "DOFQTK",
-              description: "Boarding Number",
+              title: "지급명령서",
+              description: "법률 문서 자동생성",
             },
             title: "",
             description: "",
@@ -55,42 +51,30 @@ testRouter.post("/abc", async (req, res, next) => {
               height: 800,
             },
             profile: {
-              title: "AA Airline",
+              title: "LawBot",
               imageUrl:
                 "https://t1.kakaocdn.net/openbuilder/docs_image/aaairline.jpg",
             },
             itemList: [
               {
-                title: "Flight",
-                description: "KE0605",
+                title: "임대차 종료 일자",
+                description: end_date,
               },
               {
-                title: "Boards",
-                description: "8:50 AM",
-              },
-              {
-                title: "Departs",
-                description: "9:50 AM",
-              },
-              {
-                title: "Terminal",
-                description: "1",
-              },
-              {
-                title: "Gate",
-                description: "C24",
+                title: "부동산",
+                description: home_address,
               },
             ],
             itemListAlignment: "right",
             itemListSummary: {
-              title: "Total",
-              description: "$4,032.54",
+              title: "보증금",
+              description: deposit,
             },
             buttons: [
               {
-                label: "View Boarding Pass",
+                label: "다운로드 하기",
                 action: "webLink",
-                webLinkUrl: "https://namu.wiki/w/%EB%82%98%EC%97%B0(TWICE)",
+                webLinkUrl: `http://13.125.20.89:3000/api/test/download?fileName=${fileName}`,
               },
             ],
             buttonLayout: "vertical",
@@ -112,56 +96,6 @@ testRouter.get("/download", (req, res) => {
       res.status(500).send("파일 다운로드에 실패했습니다.");
     }
   });
-});
-
-testRouter.get("/generateDocx", async (req, res, next) => {
-  const deposit = 1000000;
-  const end_date = "2023년 12월 31일";
-  const home_address = "주소 입력";
-  const curDate = Date.now().toString();
-
-  const hash = generateHash(curDate);
-
-  // Child Process를 사용하여 파이썬 코드 실행
-  exec(
-    "python docx_generator.py " +
-      deposit +
-      ' "' +
-      end_date +
-      '" "' +
-      home_address +
-      '"',
-    (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        return res.status(500).send("Internal Server Error");
-      }
-
-      // 파이썬 코드 실행 결과 출력
-      console.log(`stdout: ${stdout}`);
-      console.error(`stderr: ${stderr}`);
-
-      const currentFileName = "output.docx"; // 현재 파일 이름
-      const newFileName = `output_${hash}.docx`; // 새로운 파일 이름
-      const currentFilePath = path.join(__dirname, "../", currentFileName); // 현재 파일 경로
-      const newFilePath = path.join(
-        __dirname,
-        "../generatedDocx/",
-        newFileName
-      ); // 새로운 파일 경로
-
-      fs.rename(currentFilePath, newFilePath, (err) => {
-        if (err) {
-          console.error("파일 이름 변경 실패:", err);
-        } else {
-          console.log("파일 이름 변경 성공:");
-        }
-      });
-
-      // 결과 파일을 클라이언트로 전송
-      success(res, 200, "파일명 반환", newFileName);
-    }
-  );
 });
 
 export { testRouter };
